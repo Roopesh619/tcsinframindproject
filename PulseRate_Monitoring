@@ -1,0 +1,129 @@
+#include <SoftwareSerial.h>
+#include<LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x3F,16,2);
+#define RX 2
+#define TX 3
+String AP = "Roopesh";       // CHANGE ME
+String PASS = "ROOPESH@1234"; // CHANGE ME
+String API = "TF25F3M0WGEEFFC8";   // CHANGE ME
+String HOST = "api.thingspeak.com";
+String PORT = "80";
+String field = "field1";
+String field1 = "field2";      // PulseSensor PURPLE WIRE connected to ANALOG PIN 0
+const int LED=11;
+const int GSR=A0;
+int threshold=0;
+int sensor;
+int average=0;
+int countTrueCommand;
+int countTimeCommand; 
+boolean found = false; 
+int valSensor ;
+int BPM;
+SoftwareSerial esp8266(RX,TX); 
+ 
+  
+void setup() {
+   lcd.begin();
+    long sum=0;
+  Serial.begin(9600);
+  esp8266.begin(115200);
+  sendCommand("AT",5,"OK");
+  sendCommand("AT+CWMODE=1",5,"OK");
+  sendCommand("AT+CWJAP=\""+ AP +"\",\""+ PASS +"\"",20,"OK");
+  for(int i=0;i<500;i++)
+  {
+  sensor=analogRead(GSR);
+  sum += sensor;
+  delay(5);
+  }
+  threshold = sum/500;
+  
+}
+void loop() {
+ BPM=analogRead(A1);
+ int temp;
+  sensor=analogRead(GSR);
+  Serial.print("sensorValue=");
+  Serial.println(sensor);
+   lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("GSR Sensor:");
+  lcd.setCursor(12,0);
+  lcd.print(sensor);
+  temp = threshold - sensor;
+  if(abs(temp)>90)
+  {
+    sensor=analogRead(GSR);
+    temp = threshold - sensor;
+    if(abs(temp)>90){
+    digitalWrite(LED,HIGH);
+    lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Person stressed");
+    Serial.println("Emotion Changes Detected!");
+    delay(4000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+  lcd.print("GSR Sensor:");
+  lcd.setCursor(12,0);
+  lcd.print(sensor);
+    digitalWrite(LED,LOW);
+    delay(100);
+  }
+ }
+ valSensor = sensor;
+ Serial.print("BPM:");
+Serial.println(BPM/6);
+  lcd.setCursor(0,1);
+  lcd.print("BPM Sensor:");
+  lcd.setCursor(12,1);
+  lcd.print(BPM/6);
+   delay(1000);
+  
+ String getData = "GET /update?api_key="+ API +"&"+ field +"="+String(valSensor);
+sendCommand("AT+CIPMUX=1",5,"OK");
+ sendCommand("AT+CIPSTART=0,\"TCP\",\""+ HOST +"\","+ PORT,15,"OK");
+ sendCommand("AT+CIPSEND=0," +String(getData.length()+4),4,">");
+ esp8266.println(getData);delay(100);countTrueCommand++;
+ sendCommand("AT+CIPCLOSE=0",5,"OK");
+ String getData1 = "GET /update?api_key="+ API +"&"+ field1 +"="+String(BPM/6);
+sendCommand("AT+CIPMUX=1",5,"OK");
+ sendCommand("AT+CIPSTART=0,\"TCP\",\""+ HOST +"\","+ PORT,15,"OK");
+ sendCommand("AT+CIPSEND=0," +String(getData1.length()+4),4,">");
+ esp8266.println(getData1);delay(100);countTrueCommand++;
+ sendCommand("AT+CIPCLOSE=0",5,"OK");
+}
+int getSensorData(){
+  return random(100); // Replace with 
+}
+void sendCommand(String command, int maxTime, char readReplay[]) {
+
+  while(countTimeCommand < (maxTime*1))
+  {
+    esp8266.println(command);//at+cipsend
+    if(esp8266.find(readReplay))//ok
+    {
+      found = true;
+      break;
+    }
+  
+    countTimeCommand++;
+  }
+  
+  if(found == true)
+  {
+    
+    countTrueCommand++;
+    countTimeCommand = 0;
+  }
+  
+  if(found == false)
+  {
+     
+    countTrueCommand = 0;
+    countTimeCommand = 0;
+  }
+  
+  found = false;
+ }
